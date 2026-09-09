@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Kafka lesson"
+  short_description: "Extend Kafka demo slides and live concept modules"
+  default_prompt: "Use $add-kafka-lesson to add a lesson to the Kafka demo presentation."

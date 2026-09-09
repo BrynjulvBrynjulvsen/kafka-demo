@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kafka, live · Partitioning</title>
+  <link rel="stylesheet" href="vendor/reveal/reveal.css">
+  <link rel="stylesheet" href="css/slides.css">
+</head>
+<body>
+  <header class="deck-header"><a href="#/">KAFKA<span> / LIVE LAB</span></a><span id="connection" role="status">Connecting…</span></header>
+  <div class="reveal"><div class="slides">
+    <section>
+      <p class="eyebrow">01 / PARTITIONING</p>
+      <h1>One topic.<br><span>Many ordered logs.</span></h1>
+      <p class="intro">Send a record. Follow its key.<br>See where Kafka puts it.</p>
+      <div class="pipeline"><span>Browser producer</span><b>→</b><span>Kafka topic</span><b>→</b><span>Live observation</span></div>
+      <p class="footnote">A real broker. Real partitions and offsets. Use → to begin.</p>
+    </section>
+    <section>
+      <p class="eyebrow">02 / PREDICT</p>
+      <h2>Where will the next<br>record land?</h2>
+      <div class="predictions">
+        <article><span>01</span><h3>Repeat a key</h3><p>With the same partition count and default partitioner, the same key selects the same partition.</p></article>
+        <article><span>02</span><h3>Change the key</h3><p>Different keys can share a partition. Try several; do not expect one partition per key.</p></article>
+        <article><span>03</span><h3>Leave it empty</h3><p>A null key lets the producer choose. Batching means this is not necessarily round-robin.</p></article>
+      </div>
+      <p class="footnote">Look for ordering within a partition. Offsets from different partitions are not a global sequence.</p>
+    </section>
+    <section data-concept="partitioning">
+      <p class="eyebrow">03 / EXPERIMENT</p>
+      <h2>Follow the key.</h2>
+      <div class="lab">
+        <form id="producer">
+          <label for="topic">Topic</label><select id="topic" disabled></select>
+          <label for="key">Record key <small>empty = null</small></label><input id="key" value="customer-1" maxlength="1024" autocomplete="off">
+          <label for="value">Value</label><textarea id="value" maxlength="16384" rows="2">Hello Kafka</textarea>
+          <button id="send" type="submit" disabled>Produce record ↗</button>
+          <p id="produce-status" role="status">Discovering configured topics…</p>
+          <button id="reconnect" class="secondary" type="button">Reconnect stream</button>
+        </form>
+        <div class="observations">
+          <div class="observation-heading"><span>CONSUMED RECORDS <b id="count">0</b></span><button id="clear" class="secondary" type="button">Clear display</button></div>
+          <div id="partitions"><p class="empty">Waiting for consumed records.<br>Produce a record to discover its partition.</p></div>
+          <p class="legend">Only observed partitions appear. Latest 4 cards per partition; older cards fade as new ones arrive. Clearing changes this display only.</p>
+        </div>
+      </div>
+    </section>
+    <section>
+      <p class="eyebrow">04 / INSPECT & CHANGE</p>
+      <h2>The code is the lesson.</h2>
+      <div class="code-layout"><pre><code>// MessageController.kt
+kafka.send(ProducerRecord(
+    topic, message.key, message.value
+))
+
+// TopicConsumer.kt
+partition = record.partition()
+offset = record.offset()</code></pre><div><h3>Change one thing.</h3><p>Return to the lab. Keep the key and change the value. Then change the key. Compare the observed partition and offset.</p><p>Open a second browser window: both viewers receive copies from the same backend consumer.</p></div></div>
+      <p class="footnote">HTTP success = broker acknowledgment. A card = backend consumption observed.<br>Neither proves application processing or an offset commit. Reconnecting has no browser replay.</p>
+    </section>
+  </div></div>
+  <footer>APACHE KAFKA / EXPERIMENT 001 <span>← → navigate · Esc overview · F fullscreen</span></footer>
+  <script type="module" src="js/slides.js"></script>
+</body>
+</html>
