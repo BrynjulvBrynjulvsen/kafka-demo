@@ -138,3 +138,13 @@ pre-refresh experiment configuration: one A member, two B members, 1000 ms delay
 Processing delay is now per group (`groupDelays` in snapshots), controlled in the
 shared membership widget on groups/offsets/lag. Commands must identify the group;
 new workers inherit that group’s current setting. The cap remains 1000 ms/record.
+
+
+## Architecture documentation review, 2026-09-10
+
+ADR-00007 records the independent worker runtime and shared snapshot transport.
+ADR-00008 now records the shared widget boundary, panel-local selection versus
+backend-owned settings, per-group delay lifetime, and limits of inferred status.
+The experiment payload changed from scalar delayMs to groupDelays without an
+experiment envelope version bump; bundled frontend/backend must be refreshed
+together. The original consumed-record protocol is unaffected.

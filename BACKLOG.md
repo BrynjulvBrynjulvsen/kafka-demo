@@ -1,6 +1,6 @@
 # Kafka lesson backlog
 
-Updated 2026-09-09. Rows 1–4 are implemented; remaining rows are proposals.
+Updated 2026-09-10. Rows 1–4 are implemented; remaining rows are proposals.
 The implementation plan below records the intended teaching behavior and acceptance checks.
 Source material: the sibling [workshop exercises](../kafka-workshop/exercises/),
 the current partitioning deck, and [the authoring guide](docs/ADDING_LESSONS.md).
@@ -9,14 +9,15 @@ Each row can span prediction, experiment, and code slides. Complexity covers a
 working visual lesson, including missing backend observations: **Low** reuses the
 current stream; **Medium** adds focused controls or instrumentation; **High**
 requires substantial processing or infrastructure. Ordering is the recommended
-implementation priority, with rows 1–4 selected for the next increment.
+historical ordering; rows 1–4 are complete. The next planned batch is rows 6, 8
+and 9; see the revised priorities below.
 
 | Topic | Brief description of lesson taught | Rough estimate of complexity |
 | --- | --- | --- |
-| **1. Ordering and partition-local offsets** | Extend the existing lesson with numbered events in partition lanes. Show why offsets describe order within a partition, without establishing a global order across partitions. Exercises 1, 3. | **Low** — reuse existing record metadata and producer. |
-| **2. Consumer groups and parallelism** | Draw connections between partitions and consumers. Add consumers until some remain idle; add a second group to show independent consumption of the same log. Exercises 2, 3. | **Medium** — controlled demo consumers plus group/member and assignment observations. |
-| **3. Offsets, commits, and replay** | Put consumed position and committed offset on a timeline. Stop, restart, and reset a dedicated group to show where reading resumes; explain when earliest/latest applies. Exercises 1, 2. | **Medium** — commit/position observations and explicit restart/reset controls. |
-| **4. Consumer lag and catching up** | Show the distance between log end and committed offset growing as processing slows, then shrinking during recovery. Separate fetched records from completed work. Exercise 11. | **Medium** — broker/group offset sampling, processing signals, adjustable workload. |
+| ✓ **1. Ordering and partition-local offsets** | Extend the existing lesson with numbered events in partition lanes. Show why offsets describe order within a partition, without establishing a global order across partitions. Exercises 1, 3. | **Low** — reuse existing record metadata and producer. |
+| ✓ **2. Consumer groups and parallelism** | Draw connections between partitions and consumers. Add consumers until some remain idle; add a second group to show independent consumption of the same log. Exercises 2, 3. | **Medium** — controlled demo consumers plus group/member and assignment observations. |
+| ✓ **3. Offsets, commits, and replay** | Put consumed position and committed offset on a timeline. Stop, restart, and reset a dedicated group to show where reading resumes; explain when earliest/latest applies. Exercises 1, 2. | **Medium** — commit/position observations and explicit restart/reset controls. |
+| ✓ **4. Consumer lag and catching up** | Show the distance between log end and committed offset growing as processing slows, then shrinking during recovery. Separate fetched records from completed work. Exercise 11. | **Medium** — broker/group offset sampling, processing signals, adjustable workload. |
 | **5. Rebalancing** | Join or stop a consumer and animate observed partition ownership changes. Show the transition and recovery rather than only the final assignment. Exercises 2, 3. | **Medium** — reuse the group lab; add assignment/revocation events and lifecycle controls. |
 | **6. Hot keys and uneven load** | Send mostly one key and watch one partition dominate. Explore why adding consumers may leave the bottleneck unchanged. Extension of exercise 3. | **Low–Medium** — keyed workload presets and distribution counters; processing/lag instrumentation for a measured bottleneck. |
 | **7. Null keys, sticky partitioning, and batching** | Predict whether null-key sends rotate partitions. Compare observed distribution while changing payload volume and producer settings; explain the latency/throughput tradeoff. Already identified in the demo roadmap. | **Medium** — workload/configuration controls and producer metrics; record cards alone cannot expose batch boundaries. |
@@ -31,7 +32,35 @@ implementation priority, with rows 1–4 selected for the next increment.
 | **16. Replication, acknowledgments, and broker failure** | Show leaders, replicas, and ISR; stop a broker and observe availability under different acknowledgment settings. Extension of exercise 11. | **High** — multi-broker infrastructure, controller-topology decisions, and broker-state instrumentation. |
 | **17. Authentication and authorisation** | Visualise identity checks separately from permission checks. Predict which produce/consume operations succeed for different principals. Exercise 10. | **Medium–High** — authenticated clients, ACL scenarios, and observable failures. |
 
-## Plan for lessons 1–4
+## Next batch and revised priorities
+
+[Detailed demo plan](docs/NEXT_DEMOS.md): hot keys → failure/duplicate effects
+with idempotency → retries/dead-letter handling. These remain unimplemented.
+
+Then: current state (10), compaction/retention (11), producer batching (7), schema
+evolution (12), windowed processing (13), and event time (14). Replication (16)
+is gated on multi-broker infrastructure; Connect (15) and authentication (17)
+remain optional later tracks. IDs above stay stable for references.
+
+Treat rebalancing (5) as an extension of the group lesson for now. A dedicated
+lesson should add deeper transition/failure observations rather than repeat the
+membership controls already delivered.
+
+## Completed work
+
+- [x] Lesson 1: ordering and partition-local offsets.
+- [x] Lesson 2: consumer groups and parallelism.
+- [x] Lesson 3: offsets, commits, and replay.
+- [x] Lesson 4: consumer lag and catching up.
+- [x] Shared membership widget on groups, offsets, and lag.
+- [x] Per-group processing delay in the shared widget and backend.
+- [x] Architecture decisions and authoring documentation (ADRs 00007–00008).
+
+Verification details are recorded in [CONTEXT.md](CONTEXT.md). Rebalancing
+observations support the current group lesson; deeper work in row 5 remains
+open as an extension rather than the next standalone lesson.
+
+## Original implementation plan for lessons 1–4
 
 Implement in order: ordering → a shared group experiment backend and group lesson
 → commits/replay → lag. Lesson 1 can ship independently. Lessons 2–4 reuse one

@@ -23,3 +23,19 @@ must be pre-created and allowlisted. It does not resize topics. Offset resets ar
 limited to inactive allowlisted groups and retained offsets. This deliberately
 avoids general Kafka administration and leaves production failure semantics to
 later lessons.
+
+
+## Alternatives and consequences
+
+Reusing the observer consumer for experiments would couple record fan-out to
+presenter actions and change its membership/commit behavior. Per-slide consumers
+or sockets would make navigation part of the experiment. Both conflict with the
+established separation of observation and experiment lifecycles.
+
+Dedicated workers add backend state and explicit cleanup responsibilities, while
+keeping the teaching loop readable and independently controllable. Bounded
+snapshots recover current display state, not a complete event history. Consumers
+can continue when no browser is watching; the presenter must explicitly stop them.
+
+[ADR-00008](ADR-00008-shared-group-controls-and-settings.md) extends this decision
+with the shared membership widget and backend-owned per-group processing settings.

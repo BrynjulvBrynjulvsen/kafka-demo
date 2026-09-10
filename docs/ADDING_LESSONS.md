@@ -167,7 +167,7 @@ assignment before running browser tests after an application restart.
 `js/controls/group-membership.js` exports `mountGroupMembership(host, { run })`.
 It owns the group/policy fields and exposes `group` and `update(snapshot, disabled)`.
 The widget is used by the groups, offsets and lag presenter panels. It never opens
-connections or polls; only explicit Add member/Stop group clicks invoke commands.
+connections or polls; only explicit membership or processing-delay interactions invoke commands.
 Selection is local to each panel, and retains the actual group ID while displaying
 Group A/B. Snapshot updates preserve focus and the chosen group/start policy.
 
@@ -181,3 +181,7 @@ The membership widget also owns a per-group processing-delay selector. Explicit
 changes dispatch `delay` with `group` and `delayMs`; snapshots carry `groupDelays`
 instead of the former global `delayMs`. Render the confirmed value when switching
 groups or receiving updates from another viewer. Lag displays both group delays.
+
+[ADR-00008](adr/ADR-00008-shared-group-controls-and-settings.md) records why selection
+is panel-local while membership and per-group settings are backend-owned, and why
+the widget status is an observation summary rather than a broker-state claim.
