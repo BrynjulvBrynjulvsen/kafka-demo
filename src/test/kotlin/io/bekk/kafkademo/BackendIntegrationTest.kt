@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = [
     "demo.topics=demo-test,other-test", "demo.default-topic=demo-test",
     "spring.kafka.consumer.group-id=kafka-demo-test",
+    "demo.experiment.enabled=false",
 ])
 @EmbeddedKafka(partitions = 3, topics = ["demo-test", "other-test"],
     bootstrapServersProperty = "spring.kafka.bootstrap-servers")

@@ -12,7 +12,7 @@ Last updated: 2026-09-09
 
 BACKLOG rows 1–4 now have prediction, experiment and inspect/change slides at
 `/#/ordering`, `/#/groups`, `/#/offsets`, and `/#/lag`. Ordering uses the original
-record stream. Groups, offsets and lag use an opt-in `ExperimentRuntime` with two
+record stream. Groups, offsets and lag use an `ExperimentRuntime` with two
 allowlisted groups, up to four members each, and the dedicated `kafka-demo-lab`
 topic. `ExperimentController` provides bounded explicit commands. The worker loop
 is a plain KafkaConsumer poll/process/commit loop separate from the Spring observer.
@@ -30,6 +30,13 @@ this section and README describe the extended deck.
 
 ## Current implementation
 
+Experiments are enabled by default, with `kafka-demo` and `kafka-demo-lab` in the
+initial topic allowlist. Create both topics before startup. Explicitly set
+`DEMO_EXPERIMENT_ENABLED=false` to disable experiment sampling and commands; also
+set `KAFKA_TOPICS=kafka-demo` when running without a lab topic. Enabled experiments
+start broker sampling; worker membership and workloads still require commands.
+See [experiment setup and use cases](README.md#ordering-groups-replay-and-lag-lessons).
+
 One Kotlin / Spring Boot application runs an HTTP API and plain JSON WebSocket endpoint. A Spring Kafka listener subscribes to the configured topic list at startup and fans consumed records out to viewers of each topic.
 
 | Interface | Behavior |
@@ -45,6 +52,8 @@ The stream is best-effort. Records consumed without viewers are logged and disca
 ## Code map
 
 All application classes live under `src/main/kotlin/io/bekk/kafkademo`.
+See [Backend structure](README.md#backend-structure-and-code-to-teach-from) for a
+responsibility diagram and the distinction between observation and experiment consumers.
 
 | File | Responsibility |
 | --- | --- |
@@ -52,6 +61,8 @@ All application classes live under `src/main/kotlin/io/bekk/kafkademo`.
 | [DemoProperties.kt](src/main/kotlin/io/bekk/kafkademo/DemoProperties.kt) | Validate configured topics and the producer default |
 | [MessageController.kt](src/main/kotlin/io/bekk/kafkademo/MessageController.kt) | HTTP production and topic discovery |
 | [TopicConsumer.kt](src/main/kotlin/io/bekk/kafkademo/TopicConsumer.kt) | Kafka listener and versioned observation model |
+| [ExperimentController.kt](src/main/kotlin/io/bekk/kafkademo/ExperimentController.kt) | HTTP experiment state, commands, and error responses |
+| [ExperimentRuntime.kt](src/main/kotlin/io/bekk/kafkademo/ExperimentRuntime.kt) | Experiment workers, poll/process/commit loop, workloads, broker sampling, and offset resets |
 | [WebSocketConfiguration.kt](src/main/kotlin/io/bekk/kafkademo/WebSocketConfiguration.kt) | WebSocket routing, origin allowlist, and topic validation |
 | [TopicWebSocketHandler.kt](src/main/kotlin/io/bekk/kafkademo/TopicWebSocketHandler.kt) | Per-viewer bounded queues and sender lifecycle |
 | [application.yml](src/main/resources/application.yml) | Cluster connection, group, acknowledgment policy, and environment overrides |

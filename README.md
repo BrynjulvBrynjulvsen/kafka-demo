@@ -13,13 +13,15 @@ A small Kotlin / Spring Boot service that produces UTF-8 string messages and str
 
 ## Run
 
-Requires JDK 17 and the workshop Kafka broker. Create the demo topic once in the current Docker context:
+Requires JDK 17 and the workshop Kafka broker. Create both demo topics once in the current Docker context:
 
 If your default Java is newer than the Gradle wrapper supports, set `JAVA_HOME` to a JDK 17 installation first.
 
 ```sh
 docker exec kafka1 kafka-topics --bootstrap-server kafka1:9092 \
   --create --if-not-exists --topic kafka-demo --partitions 3 --replication-factor 1
+docker exec kafka1 kafka-topics --bootstrap-server kafka1:9092 \
+  --create --if-not-exists --topic kafka-demo-lab --partitions 3 --replication-factor 1
 ./gradlew bootRun
 ```
 
@@ -96,7 +98,7 @@ See `.env.example`. Export variables in the shell before starting; Spring does n
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9094` | Workshop broker; comma-separated for multiple brokers |
-| `KAFKA_TOPICS` | `kafka-demo` | Topic allowlist consumed at startup |
+| `KAFKA_TOPICS` | `kafka-demo,kafka-demo-lab` | Topic allowlist consumed at startup |
 | `KAFKA_DEFAULT_TOPIC` | `kafka-demo` | Default producer topic; must be in the allowlist |
 | `KAFKA_GROUP_ID` | `kafka-demo` | Dedicated group, independent of workshop consumers |
 | `PORT` | `8080` | HTTP and WebSocket port |
@@ -106,18 +108,74 @@ See `.env.example`. Export variables in the shell before starting; Spring does n
 For example, after creating both topics:
 
 ```sh
-KAFKA_TOPICS=kafka-demo,orders KAFKA_DEFAULT_TOPIC=orders ./gradlew bootRun
+KAFKA_TOPICS=kafka-demo,orders DEMO_EXPERIMENT_ENABLED=false KAFKA_DEFAULT_TOPIC=orders ./gradlew bootRun
 ```
 
 All standard `spring.kafka.*` properties remain available for security and consumer/producer tuning. The HTTP API has no authentication and defaults to loopback for local workshops. HTTP browser CORS is not enabled; the slides use the backend's origin. When changing `PORT` or the browser hostname, include that origin in `WEBSOCKET_ALLOWED_ORIGINS`.
 
-## Code to teach from
+## Backend structure and code to teach from
 
-- `MessageController.kt`: KafkaTemplate production and broker acknowledgment metadata.
-- `TopicConsumer.kt`: the Kafka listener and consumed-record envelope.
-- `DemoProperties.kt` and `application.yml`: topics, consumer group, offsets, and producer settings.
-- `TopicWebSocketHandler.kt`: bounded fan-out, disconnection, and no-viewer behavior.
-- `WebSocketConfiguration.kt`: topic selection and handshake validation.
+The backend is one Spring Boot application, with all classes in
+`src/main/kotlin/io/bekk/kafkademo`. HTTP controllers accept presenter requests;
+Kafka consumers supply observations; one WebSocket handler delivers them to
+viewers. The ordinary producer path uses `KafkaTemplate` directly, so the code
+responsible for a send is easy to find.
+
+There are two independent consumption paths. `TopicConsumer` observes configured
+topics from startup, even with no viewers. The `ExperimentRuntime` owns
+separate consumer groups for the groups, replay and lag lessons; its workers start
+only on explicit commands. Opening a socket or navigating slides changes neither
+path's Kafka membership.
+
+```mermaid
+flowchart LR
+    browser["Browser / presenter"]
+    kafka[(Kafka)]
+
+    subgraph backend["Spring Boot backend"]
+        messages["MessageController<br/>Validate sends; return broker metadata"]
+        observer["TopicConsumer<br/>Turn consumed records into observations"]
+        experiments["ExperimentController<br/>Expose state and presenter commands"]
+        runtime["ExperimentRuntime<br/>Manage workers and workloads;<br/>sample broker offsets and lag"]
+        worker["ExperimentRuntime.Worker<br/>Poll, simulate processing, commit"]
+        sockets["TopicWebSocketHandler<br/>Queue and send observations per viewer"]
+        wsconfig["WebSocketConfiguration<br/>Register route; check topic and origin"]
+    end
+
+    browser -->|HTTP messages / topics| messages
+    messages -->|KafkaTemplate send| kafka
+    kafka -->|Spring Kafka listener| observer
+    observer -->|record-consumed| sockets
+    browser -->|HTTP experiment state / commands| experiments
+    experiments --> runtime
+    runtime -->|Start / stop| worker
+    worker <-->|Poll / commit| kafka
+    runtime <-->|Admin samples / resets; workload sends| kafka
+    runtime -->|experiment-snapshot| sockets
+    browser -->|WebSocket handshake| wsconfig
+    wsconfig -.->|Route to handler| sockets
+    sockets -->|Topic WebSocket events| browser
+```
+
+Arrows show the main calls and event paths, not every injected dependency. Startup
+and shared configuration are described below.
+
+| Class / file | Responsibility and useful changes to inspect |
+| --- | --- |
+| [Application](src/main/kotlin/io/bekk/kafkademo/Application.kt) | Boot entry point; discovers components and configuration properties. |
+| [DemoProperties](src/main/kotlin/io/bekk/kafkademo/DemoProperties.kt) | Holds and validates the topic allowlist and producer default; holds allowed WebSocket origins. |
+| [MessageController](src/main/kotlin/io/bekk/kafkademo/MessageController.kt) | Lists configured topics, validates production requests, sends through `KafkaTemplate`, and returns acknowledgment metadata. Request/response data classes live here too. |
+| [TopicConsumer](src/main/kotlin/io/bekk/kafkademo/TopicConsumer.kt) | Converts Spring Kafka listener records into the `ConsumedMessage` envelope defined in the same file, then publishes to viewers. |
+| [ExperimentController](src/main/kotlin/io/bekk/kafkademo/ExperimentController.kt) | Thin HTTP adapter for runtime snapshots and commands; translates command failures into HTTP responses. |
+| [ExperimentRuntime](src/main/kotlin/io/bekk/kafkademo/ExperimentRuntime.kt) | Validates experiment commands; owns worker lifecycle, per-group delay, bounded workloads/history, broker sampling and inactive-group offset resets. Its private `Worker` contains the plain `KafkaConsumer` poll/process/commit loop. |
+| [TopicWebSocketHandler](src/main/kotlin/io/bekk/kafkademo/TopicWebSocketHandler.kt) | Owns viewer connections, bounded queues and sender threads; fans out by topic and disconnects slow viewers. Retains the latest experiment snapshot for reconnects, but no consumed-record replay buffer. |
+| [WebSocketConfiguration](src/main/kotlin/io/bekk/kafkademo/WebSocketConfiguration.kt) | Registers the socket route, origin allowlist and topic-checking handshake; also exposes `demoTopicNames` for the Kafka listener. |
+| [application.yml](src/main/resources/application.yml) | Supplies cluster connection, observer group, acknowledgment policy, producer settings and environment overrides. |
+
+The WebSocket boundary keeps socket writes off Kafka's listener thread. A
+`record-consumed` event establishes that the observer received a record; processing
+and commit observations come from the separate experiment workers. The demo's
+processing step is a configurable sleep, not an external business operation.
 
 ## Tests
 
@@ -171,22 +229,35 @@ These commands use the current Docker context and the workshop's existing `kafka
 ## Ordering, groups, replay and lag lessons
 
 Ordering works with the original setup at `http://localhost:8080/#/ordering`.
-The remaining lessons use an opt-in experiment runtime. Create its topic first:
+The remaining lessons use experiments, which are **enabled by default**. The Run
+instructions create both required topics; no enable flag is needed. Startup begins
+periodic broker sampling and permits commands to start dedicated consumers,
+generate bounded workloads and reset offsets for inactive experiment groups.
+Workers and workloads still require explicit presenter commands; browser navigation
+and WebSocket connections never start them. Use a dedicated lab topic and group
+prefix, with broker permissions for the experiment's production, consumption,
+topic/group inspection and offset resets.
+
+**Explicitly opt out** with `DEMO_EXPERIMENT_ENABLED=false` when running only the
+basic producer, partitioning and ordering demo, or using a shared/restricted cluster
+where experiment commands should be unavailable. This disables experiment broker
+sampling and rejects experiment commands. If the lab topic is absent, also remove
+it from the observer's topic allowlist:
 
 ```sh
-docker exec kafka1 kafka-topics --bootstrap-server kafka1:9092 \
-  --create --if-not-exists --topic kafka-demo-lab --partitions 3 --replication-factor 1
-KAFKA_TOPICS=kafka-demo,kafka-demo-lab DEMO_EXPERIMENT_ENABLED=true ./gradlew bootRun
+KAFKA_TOPICS=kafka-demo DEMO_EXPERIMENT_ENABLED=false ./gradlew bootRun
 ```
 
-For the Docker application command above, additionally pass
-`-e KAFKA_TOPICS=kafka-demo,kafka-demo-lab -e DEMO_EXPERIMENT_ENABLED=true`.
+For Docker, pass `-e DEMO_EXPERIMENT_ENABLED=false -e KAFKA_TOPICS=kafka-demo`
+to the application container for the same basic setup. Disabling experiments alone
+does not change the observer's configured topics.
+
 Use one backend instance and wait for its observer partition assignment before
 producing. The runtime does not create topics or start members on its own.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `DEMO_EXPERIMENT_ENABLED` | `false` | Enable dedicated experiment workers and broker sampling |
+| `DEMO_EXPERIMENT_ENABLED` | `true` | Set `false` to disable experiment broker sampling and commands |
 | `DEMO_EXPERIMENT_TOPIC` | `kafka-demo-lab` | Pre-created topic, must also appear in KAFKA_TOPICS |
 | `DEMO_EXPERIMENT_GROUP_PREFIX` | `kafka-demo-experiment` | Two allowlisted groups, with suffixes `-a` and `-b`; keep separate from observer/workshop groups |
 

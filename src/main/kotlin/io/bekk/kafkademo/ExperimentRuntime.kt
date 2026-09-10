@@ -24,7 +24,7 @@ class ExperimentRuntime(
     private val producer: KafkaTemplate<String, String>,
     private val streams: TopicWebSocketHandler,
     private val demo: DemoProperties,
-    @param:Value("\${demo.experiment.enabled:false}") val enabled: Boolean,
+    @param:Value("\${demo.experiment.enabled:true}") val enabled: Boolean,
     @param:Value("\${demo.experiment.topic:kafka-demo-lab}") val topic: String,
     @Value("\${demo.experiment.group-prefix:kafka-demo-experiment}") prefix: String,
 ) {
