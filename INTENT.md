@@ -1,6 +1,6 @@
 # Project intent
 
-Last updated: 2026-09-08
+Last updated: 2026-09-09
 
 ## Goal
 
@@ -32,6 +32,8 @@ This is a local teaching application. Production hosting, authentication, arbitr
 Do not imply guarantees the observations cannot establish. A consumed record does not by itself prove application processing completion, offset commit, or replication state. Browser reconnection and Kafka replay are different operations.
 
 ## Evolution
+
+- 2026-09-09: Selected and implemented the next lesson sequence: ordering, consumer groups, offsets/replay, and lag. Dedicated opt-in experiment consumers supply the missing observations while independent visual modules reuse the shared transport. BACKLOG.md tracks the remaining concepts.
 
 - 2026-09-08: Prioritized a documented slide/concept authoring workflow and reusable agent skill. Identified batching and null-key sticky partitioning as a future standalone lesson requiring care about what producer behavior is actually observable.
 

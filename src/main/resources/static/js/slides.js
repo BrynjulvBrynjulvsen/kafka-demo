@@ -1,8 +1,15 @@
 import { LiveClient } from './live-client.js';
 import { mountPartitioning } from './concepts/partitioning.js';
 
+import { mountOrdering } from './concepts/ordering.js';
+import { mountGroups } from './concepts/groups.js';
+import { mountOffsets } from './concepts/offsets.js';
+import { mountLag } from './concepts/lag.js';
+import { wireOrdering } from './controls/ordering-controls.js';
+import { wireExperimentControls } from './controls/experiment-controls.js';
+
 const client = new LiveClient();
-const concepts = { partitioning: mountPartitioning };
+const concepts = { partitioning: mountPartitioning, ordering: mountOrdering, groups: mountGroups, offsets: mountOffsets, lag: mountLag };
 const mounted = [...document.querySelectorAll('[data-concept]')].map(root => concepts[root.dataset.concept](root));
 const topic = document.querySelector('#topic');
 const send = document.querySelector('#send');
@@ -12,12 +19,34 @@ let busy = false;
 client.addEventListener('status', ({ detail }) => {
   connection.textContent = detail.text; connection.dataset.state = detail.state;
 });
-client.addEventListener('record', ({ detail }) => mounted.forEach(concept => concept.onRecord(detail)));
+function dispatch(method, detail) {
+  mounted.forEach(concept => {
+    try { concept[method]?.(detail); }
+    catch (error) { console.error(`Concept ${method} failed`, error); }
+  });
+}
+client.addEventListener('record', ({ detail }) => dispatch('onRecord', detail));
+const experimentControls = [...document.querySelectorAll('[data-role="experiment-controls"]')].map(host =>
+  wireExperimentControls(host.closest('section'), {
+    command: command => client.experiment(command), selectedTopic: () => topic.value,
+    selectTopic: name => { topic.value = name; selectTopic(); },
+  }));
+let experimentSnapshot;
+function experiment(snapshot) {
+  experimentSnapshot = snapshot;
+  experimentControls.forEach(control => control.update(snapshot));
+  if (snapshot.topic === topic.value) dispatch('onExperiment', snapshot);
+}
+client.addEventListener('experiment', ({ detail }) => experiment(detail));
+wireOrdering(document.querySelector('[data-concept="ordering"]'), {
+  produce: message => client.produce(message), selectedTopic: () => topic.value,
+});
 
 function selectTopic() {
-  mounted.forEach(concept => concept.reset());
+  dispatch('reset');
   status.textContent = 'Ready to produce. Subscription does not confirm Kafka consumer assignment.';
   client.connect(topic.value);
+  if (experimentSnapshot) experimentControls.forEach(control => control.update(experimentSnapshot));
 }
 async function discover() {
   try {
@@ -25,6 +54,7 @@ async function discover() {
     topic.replaceChildren(...config.topics.map(name => new Option(name, name)));
     topic.value = config.defaultTopic; topic.disabled = false; send.disabled = false;
     selectTopic();
+    client.experiment().then(experiment).catch(error => experimentControls.forEach(c => c.error(error.message)));
   } catch (error) {
     status.textContent = `${error.message} Use Reconnect stream to retry.`;
     connection.textContent = 'Backend unavailable'; connection.dataset.state = 'error';

@@ -4,6 +4,7 @@ A small Kotlin / Spring Boot service that produces UTF-8 string messages and str
 
 ## Project documentation
 
+- [BACKLOG.md](BACKLOG.md): lesson roadmap and acceptance plans.
 - [INTENT.md](INTENT.md): project goals and evolving scope.
 - [CONTEXT.md](CONTEXT.md): current implementation, working context, and verification history.
 - [Architecture decisions](docs/adr/README.md): accepted decisions and proposals.
@@ -22,7 +23,7 @@ docker exec kafka1 kafka-topics --bootstrap-server kafka1:9092 \
 ./gradlew bootRun
 ```
 
-The backend listens at `http://localhost:8080`. Topics must exist before startup; the consumer does not create topics. Existing topics are never resized or reset by the application.
+The backend listens at `http://localhost:8080`. Topics must exist before startup; the consumer does not create topics. Existing topics are never resized by the application. The optional experiment API can reset offsets only for its inactive allowlisted groups.
 
 The workshop Compose stack also includes [Kafbat UI](http://localhost:8081). Open **workshop → Topics → kafka-demo → Messages** and compare a presentation record's topic, partition, offset, key, and value. Kafbat connects to the same broker through `kafka1:9092`; select String deserialization for demo keys and values. See the [workshop instructions](../kafka-workshop/README.md#browse-records-with-kafbat-ui) for startup details.
 
@@ -38,7 +39,7 @@ Use arrow keys to navigate, Esc for overview, and F for fullscreen. Form control
 
 To refresh the bundled library after intentionally changing its version in `package.json`, run `npm install` and `npm run vendor`, then commit the lockfile and vendor assets. For an unchanged lockfile, use `npm ci` instead. Gradle includes the checked-in assets in the application JAR.
 
-The frontend is plain JavaScript served by Spring Boot from `src/main/resources/static`, using same-origin HTTP and WebSocket URLs. `index.html` defines the lesson, `js/slides.js` wires navigation and controls, `js/live-client.js` owns transport, and `js/concepts/partitioning.js` renders observations. New concepts register a mount function that returns `onRecord` and `reset`; this small boundary remains provisional until a second lesson exercises it.
+The frontend is plain JavaScript served by Spring Boot from `src/main/resources/static`, using same-origin HTTP and WebSocket URLs. `index.html` defines the lesson, `js/slides.js` wires navigation and controls, `js/live-client.js` owns transport, and `js/concepts/partitioning.js` renders observations. New concepts register a mount function that returns `onRecord` and `reset`, with optional `onExperiment` for experiment snapshots. Commands are wired separately in `js/controls`.
 
 ## Produce a record with curl
 
@@ -165,3 +166,79 @@ docker logs -f kafka-demo
 ```
 
 These commands use the current Docker context and the workshop's existing `kafkaworkshop` network. The container uses Kafka's internal listener; host execution uses `localhost:9094`. Stop and remove the application container with `docker rm -f kafka-demo` before running it again or using `bootRun` on port 8080. The Gradle cache volume can be reused between builds.
+
+
+## Ordering, groups, replay and lag lessons
+
+Ordering works with the original setup at `http://localhost:8080/#/ordering`.
+The remaining lessons use an opt-in experiment runtime. Create its topic first:
+
+```sh
+docker exec kafka1 kafka-topics --bootstrap-server kafka1:9092 \
+  --create --if-not-exists --topic kafka-demo-lab --partitions 3 --replication-factor 1
+KAFKA_TOPICS=kafka-demo,kafka-demo-lab DEMO_EXPERIMENT_ENABLED=true ./gradlew bootRun
+```
+
+For the Docker application command above, additionally pass
+`-e KAFKA_TOPICS=kafka-demo,kafka-demo-lab -e DEMO_EXPERIMENT_ENABLED=true`.
+Use one backend instance and wait for its observer partition assignment before
+producing. The runtime does not create topics or start members on its own.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DEMO_EXPERIMENT_ENABLED` | `false` | Enable dedicated experiment workers and broker sampling |
+| `DEMO_EXPERIMENT_TOPIC` | `kafka-demo-lab` | Pre-created topic, must also appear in KAFKA_TOPICS |
+| `DEMO_EXPERIMENT_GROUP_PREFIX` | `kafka-demo-experiment` | Two allowlisted groups, with suffixes `-a` and `-b`; keep separate from observer/workshop groups |
+
+Visit `/#/groups`, click **Observe experiment topic**, and start one member in A.
+Add members up to four; with three partitions, one will be idle after assignment.
+Start B and send fresh records to compare independent groups. Group membership
+continues through navigation and viewer disconnection. **Stop group members** is
+explicit; backend shutdown also stops workers.
+
+At `/#/offsets`, stop a group and wait for its members to exit. Pick a partition and
+an offset between the sampled Start and End, reset it, then restart. Resets change
+one partition only. `earliest`/`latest` is an initial-position policy, used only when
+there is no valid commit. To repeat a fresh-group comparison after both groups have
+commits, restart with a new dedicated group prefix; a display reset does not erase
+commits. Fetch position, processed progress and commit are next-offset markers.
+
+At `/#/lag`, use the previously started workers, apply a processing delay, and send
+60 records at 50 ms intervals. Stop production or wait for the bounded workload to
+finish, then reduce delay to zero to observe recovery. Delay is selected per group in the membership widget and applies to each of its
+workers, including members started later. The workload explicitly cycles through actual topic partitions. It is
+capped at 120 records through the API; processing delay is capped at 1000 ms.
+
+`GET /api/experiment` returns current configuration/state. `POST /api/experiment`
+accepts `{ "action": "start", "group": "kafka-demo-experiment-a", "policy": "earliest" }`.
+Other actions are `stop` (group), `delay` (group, delayMs), `produce` (count, intervalMs),
+`stop-production`, and `reset` (group, partition, offset). Concurrent transitions
+and invalid operations are rejected or serialized; errors include a message.
+Production is never automatically retried after an uncertain acknowledgment.
+
+Experiment snapshots share the topic WebSocket. They restore the latest state on
+reconnect and retain at most 48 recent events. Lag charts retain 40 samples. Unknown
+commits and stale broker observations are explicit. Zero committed lag does not
+prove external business processing; the demo processing step is an intentional
+sleep. Consumed-record delivery still has no replay buffer.
+
+`ExperimentRuntime.kt` contains the readable poll/process/commit loop and broker
+sampling; `ExperimentController.kt` exposes bounded presenter commands. The three
+experiment views are independent modules using optional `onExperiment(snapshot)`.
+See [ADR-00007](docs/adr/ADR-00007-controlled-experiment-runtime.md).
+
+The browser suite now also exercises ordering and experiment navigation and needs
+this enabled setup. In addition to the original six messages, it sends six ordering
+records and a 60-record lab workload. It stops its experiment workers afterward.
+
+Each experiment panel, including lag, now contains the same compact membership
+widget. Choose Group A or B, use **+ Add member** or **Stop group**, and inspect the
+member count and partition chips in place. **Start position** expands the initial
+offset policy. Status summarizes observed workers/assignments; Unknown indicates
+stale or missing observations. Group selection changes only the panel's command
+target, without creating consumers or switching the shared topic.
+
+Processing delay is now a group setting on all experiment slides. Selecting a delay
+applies it immediately to the chosen group; snapshots expose `groupDelays` keyed
+by actual group ID. Delay commands require a group. Values remain bounded to
+0–1000 ms per record; group settings survive member stops but reset on backend restart.

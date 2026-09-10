@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 class TopicWebSocketHandler(private val json: ObjectMapper) : TextWebSocketHandler() {
     private val log = LoggerFactory.getLogger(javaClass)
     private val viewers = ConcurrentHashMap<String, Viewer>()
+    private val experiments = ConcurrentHashMap<String, TextMessage>()
 
     private class Viewer(val session: WebSocketSession, val topic: String) {
         val queue = ArrayBlockingQueue<TextMessage>(64)
@@ -38,6 +39,7 @@ class TopicWebSocketHandler(private val json: ObjectMapper) : TextWebSocketHandl
         viewer.queue.add(TextMessage(json.writeValueAsString(mapOf(
             "type" to "subscribed", "version" to 1, "topic" to viewer.topic,
         ))))
+        experiments[viewer.topic]?.let { viewer.queue.add(it) }
         viewers[session.id] = viewer
         viewer.sender.start()
     }
@@ -54,6 +56,18 @@ class TopicWebSocketHandler(private val json: ObjectMapper) : TextWebSocketHandl
             if (message.payloadLength > 256 * 1024 || !viewer.queue.offer(message)) {
                 // Closing happens on the sender, never on Kafka's listener thread.
                 viewer.closeStatus = CloseStatus.POLICY_VIOLATION.withReason("Viewer cannot keep up; reconnect for live events")
+                viewers.remove(viewer.session.id, viewer)
+                viewer.sender.interrupt()
+            }
+        }
+    }
+
+    fun publishExperiment(topic: String, snapshot: Map<String, Any?>) {
+        val message = TextMessage(json.writeValueAsString(snapshot))
+        experiments[topic] = message
+        viewers.values.filter { it.topic == topic }.forEach { viewer ->
+            if (message.payloadLength > 256 * 1024 || !viewer.queue.offer(message)) {
+                viewer.closeStatus = CloseStatus.POLICY_VIOLATION.withReason("Viewer cannot keep up")
                 viewers.remove(viewer.session.id, viewer)
                 viewer.sender.interrupt()
             }

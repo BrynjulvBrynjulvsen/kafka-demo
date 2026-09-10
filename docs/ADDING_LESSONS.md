@@ -50,7 +50,7 @@ The contract is deliberately small:
 mountExample(root) => ({ onRecord(record), reset() })
 ```
 
-Both returned functions are required by the shell. Mounting should initialize the display; reset should safely work repeatedly and should only clear display state. Do not open sockets, start consumers, or produce records inside mount, reset, or onRecord. Handle incoming values as text and keep retained history bounded. Throwing from one concept currently interrupts delivery to later concepts in that event callback, so handle optional payload parsing locally.
+Both returned functions are required by the shell. An optional `onExperiment(snapshot)` receives version-1 experiment snapshots for the selected topic. Mounting should initialize the display; reset should safely work repeatedly and should only clear display state. Do not open sockets, start consumers, or produce records inside mount, reset, or onRecord. Handle incoming values as text and keep retained history bounded. The shell isolates exceptions per concept so a failed renderer does not stop other modules; handle optional payload parsing locally and report errors during verification.
 
 For example, this observation counter needs no backend changes. Add the slide:
 
@@ -96,9 +96,9 @@ The example is a copyable recipe, not an installed lesson. New modules should us
 
 ### Current limits to account for
 
-There is one selected topic for the entire deck. Concept modules receive observations from that shared stream, not independent per-slide subscriptions. The current partitioning slide and producer form use singleton IDs; copying that slide verbatim would create duplicate controls and incorrect bindings. Reuse its view by navigating to it, or extract reusable, root-scoped producer controls when a second interactive lab actually needs them. Keep a single application-level `LiveClient` and explicit user-triggered production. Do not build a general plugin framework just to add explanatory slides.
+There is one selected topic for the entire deck. Experiment controls explicitly switch it to the configured experiment topic; navigation never switches topics. Concept modules receive observations from that shared stream, not independent per-slide subscriptions. The current partitioning slide and producer form use singleton IDs; copying that slide verbatim would create duplicate controls and incorrect bindings. Reuse its view by navigating to it, or extract reusable, root-scoped producer controls when a second interactive lab actually needs them. Keep a single application-level `LiveClient` and explicit user-triggered production. Do not build a general plugin framework just to add explanatory slides.
 
-The registry currently lives next to producer wiring in `js/slides.js`. There are no mount/unmount hooks, navigation hooks, or timer disposal contract. Prefer record-driven illustrations; add lifecycle support only when a concrete lesson needs it, and document the extension here.
+The registry lives in `js/slides.js`. Reusable presenter command wiring lives in `js/controls`; `js/concepts` modules only render. The original producer form remains a singleton. There are no mount/unmount hooks or navigation hooks. Freshness timing belongs to LiveClient and is cleared on disconnect; concepts remain record/snapshot-driven. Prefer record-driven illustrations; add lifecycle support only when a concrete lesson needs it, and document the extension here.
 
 ## Presenter controls and styling
 
@@ -125,3 +125,59 @@ The owner identified batching as a future standalone lesson. It is not implement
 Start with the prediction “does a null key rotate partitions on every send?” The current default producer uses sticky partition selection for null keys, with `batch.size=16384` observed in the running configuration. Many small records can therefore land in one partition even with pauses between clicks. Verify the actual client version and settings when implementing the lesson; do not freeze this observation into a universal rule.
 
 Partition/offset cards can show the distribution and when it changes. They cannot reveal actual producer batch boundaries, compression, request grouping, or time spent waiting in the producer. If the lesson claims to show those, add appropriate producer metrics or instrumentation. Label any explanatory simulation explicitly. Potential experiments include changing payload volume, `batch.size`, and `linger.ms` one at a time; distinguish the byte threshold for sticky selection from the time limit for sending an incomplete batch. Record the chosen setup and restore changed demo settings afterward as appropriate to the request.
+
+
+## Experiment lessons (ordering, groups, offsets, lag)
+
+The deck includes prediction, experiment, and code slides at stable IDs `ordering`,
+`groups`, `offsets`, and `lag`. Each visual module is explicitly registered in the
+same registry. Add a new experiment view by implementing `onExperiment(snapshot)`
+alongside `onRecord` (which can be a no-op) and `reset`. Selectors must be root-scoped.
+Use `experiment-view.js` helpers for small tables/text, not another transport.
+
+`GET /api/experiment` discovers configuration/current state even when the runtime
+is disabled. Explicit `POST /api/experiment` commands own membership, workloads,
+processing delay and inactive-group resets. Controls use `LiveClient.experiment()`;
+command failures are not automatically retried. Opening a viewer never starts an
+experiment worker. All viewers control the same backend runtime.
+
+Enabled runtime snapshots travel over the existing topic socket as
+`experiment-snapshot`, version 1. They include group/member identity, assignment,
+next fetch position, completed processing progress, confirmed commit samples,
+retained start/end offsets, timestamps, errors, producer status and the latest 48
+worker events. Snapshots restore current display state on reconnect, not historical
+Kafka records. The stream remains best-effort. After five seconds without an update,
+LiveClient marks the experiment stale; charts keep at most 40 successful samples.
+Use sampled commit offsets to describe restart progress; a worker's processed marker
+is only the completed demo delay step, not evidence of external business effects.
+
+Ordering retains six observations per lane. Its explicitly clicked sequence control
+sends six records serially and stops on the first failed acknowledgment. Group and
+lag workloads explicitly rotate actual topic partitions; this is input balancing,
+not a demonstration of the default producer partitioner. Use the original lab for
+key-based partitioning. Never mix worker-delivery events with observer cards.
+
+Verify new experiment behavior using the embedded-broker integration test and the
+live `lessons.spec.js` browser test. The latter requires the enabled runtime and
+produces six ordering records plus a 60-record lab workload. Wait for the observer
+assignment before running browser tests after an application restart.
+
+### Shared group membership widget
+
+`js/controls/group-membership.js` exports `mountGroupMembership(host, { run })`.
+It owns the group/policy fields and exposes `group` and `update(snapshot, disabled)`.
+The widget is used by the groups, offsets and lag presenter panels. It never opens
+connections or polls; only explicit Add member/Stop group clicks invoke commands.
+Selection is local to each panel, and retains the actual group ID while displaying
+Group A/B. Snapshot updates preserve focus and the chosen group/start policy.
+
+Status is a conservative summary of observed demo workers and assignment coverage,
+not a broker group-state query. Missing/stale observations show Unknown and label
+counts as last known. Joining/stopping/rebalancing states and the four-member cap
+restrict Add; Stop remains available for active workers. Assignment rows are bounded
+by the runtime's four-member limit. Start-position options are collapsed by default.
+
+The membership widget also owns a per-group processing-delay selector. Explicit
+changes dispatch `delay` with `group` and `delayMs`; snapshots carry `groupDelays`
+instead of the former global `delayMs`. Render the confirmed value when switching
+groups or receiving updates from another viewer. Lag displays both group delays.

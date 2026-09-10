@@ -28,6 +28,11 @@ spring:
         request.timeout.ms: 5000
 
 demo:
-  topics: ${KAFKA_TOPICS:kafka-demo}
+  topics: ${KAFKA_TOPICS:kafka-demo,kafka-demo-lab}
   default-topic: ${KAFKA_DEFAULT_TOPIC:kafka-demo}
   allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173}
+
+  experiment:
+    enabled: ${DEMO_EXPERIMENT_ENABLED:true}
+    topic: ${DEMO_EXPERIMENT_TOPIC:kafka-demo-lab}
+    group-prefix: ${DEMO_EXPERIMENT_GROUP_PREFIX:kafka-demo-experiment}

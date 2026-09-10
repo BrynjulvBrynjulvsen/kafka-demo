@@ -7,6 +7,12 @@ export class LiveClient extends EventTarget {
     const generation = this.generation;
     this.topic = topic;
     let attempts = 0;
+    let lastExperiment; let receivedAt = 0;
+    this.freshnessTimer = setInterval(() => {
+      if (generation === this.generation && lastExperiment && Date.now() - receivedAt > 5000) {
+        this.emit('experiment', { ...lastExperiment, at: Date.now(), error: 'STALE · no experiment update for more than 5 seconds' });
+      }
+    }, 1000);
     const open = () => {
       if (generation !== this.generation) return;
       this.emit('status', { state: 'connecting', text: `Connecting to ${topic}…` });
@@ -21,6 +27,9 @@ export class LiveClient extends EventTarget {
         if (event.type === 'subscribed') {
           attempts = 0;
           this.emit('status', { state: 'live', text: `Subscribed · ${topic} · no replay` });
+        } else if (event.type === 'experiment-snapshot' && Array.isArray(event.members) && Array.isArray(event.offsets)) {
+          lastExperiment = event; receivedAt = Date.now();
+          this.emit('experiment', event);
         } else if (event.type === 'record-consumed' && Number.isInteger(event.partition)
           && Number.isSafeInteger(event.offset) && (event.key === null || typeof event.key === 'string')
           && (event.value === null || typeof event.value === 'string')) {
@@ -37,7 +46,16 @@ export class LiveClient extends EventTarget {
     };
     open();
   }
-  disconnect() { this.generation++; clearTimeout(this.timer); this.socket?.close(); }
+  disconnect() { this.generation++; clearTimeout(this.timer); clearInterval(this.freshnessTimer); this.socket?.close(); }
+  async experiment(command) {
+    const response = await fetch('/api/experiment', {
+      method: command ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' },
+      ...(command ? { body: JSON.stringify(command) } : {}), signal: AbortSignal.timeout(25000),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || `Command failed (HTTP ${response.status}); inspect current state before retrying.`);
+    return result;
+  }
   async topics() {
     const response = await fetch('/api/topics', { signal: AbortSignal.timeout(8000) });
     if (!response.ok) throw new Error(`Topic discovery failed (HTTP ${response.status}).`);

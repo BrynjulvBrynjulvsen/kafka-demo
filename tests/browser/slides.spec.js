@@ -55,7 +55,7 @@ test('live records, bounded cards, navigation, reconnect and safe text', async (
 test('failed production is explained and controls recover without automatic retry', async ({ page }) => {
   let posts = 0;
   await page.route('**/api/messages', route => { posts++; return route.fulfill({ status: 503, body: '{}' }); });
-  await page.goto('/#/2');
+  await page.goto('/#/partitioning');
   await expect(page.locator('#send')).toBeEnabled();
   await page.getByRole('button', { name: 'Produce record' }).click();
   await expect(page.locator('#produce-status')).toContainText('retrying can duplicate');

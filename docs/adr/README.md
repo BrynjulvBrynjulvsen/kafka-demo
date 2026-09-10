@@ -11,4 +11,6 @@ Use `ADR-0000X-short-decision-desc.md` filenames, continuing the five-digit sequ
 | [ADR-00005](ADR-00005-reuse-workshop-kafka.md) | Accepted | Reuse the workshop broker and defer repository-owned cluster infrastructure |
 | [ADR-00006](ADR-00006-separate-presentation-and-concept-plugins.md) | Accepted | reveal.js with separate navigation, live connection handling, and concept modules |
 
+| [ADR-00007](ADR-00007-controlled-experiment-runtime.md) | Accepted | Explicit experiment workers, bounded snapshots and optional concept handlers |
+
 These records document the direction in [INTENT.md](../../INTENT.md). See [CONTEXT.md](../../CONTEXT.md) for implementation status. If an accepted decision changes, create a new record and update the prior record's status and superseding link.

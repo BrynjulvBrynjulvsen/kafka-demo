@@ -1,12 +1,32 @@
 # Project context
 
-Last updated: 2026-09-08
+Last updated: 2026-09-09
 
 ## Start here
 
 - [INTENT.md](INTENT.md): why the project exists and its evolving scope.
 - [README.md](README.md): runnable commands, endpoints, configuration, and operating behavior.
 - [Architecture decisions](docs/adr/README.md): decisions, alternatives, and consequences.
+
+## Lessons added 2026-09-09
+
+BACKLOG rows 1–4 now have prediction, experiment and inspect/change slides at
+`/#/ordering`, `/#/groups`, `/#/offsets`, and `/#/lag`. Ordering uses the original
+record stream. Groups, offsets and lag use an opt-in `ExperimentRuntime` with two
+allowlisted groups, up to four members each, and the dedicated `kafka-demo-lab`
+topic. `ExperimentController` provides bounded explicit commands. The worker loop
+is a plain KafkaConsumer poll/process/commit loop separate from the Spring observer.
+See README for environment flags, setup, restart/reset semantics and workload limits.
+
+Concepts remain explicitly registered independent modules with onRecord/reset and
+optional onExperiment(snapshot). Presenter controls live under `js/controls`.
+Experiment snapshots share the single application socket and restore current state
+on reconnect; navigation never starts workers. Backend history is capped at 48
+recent events, ordering at six cards per lane, and lag at 40 samples. Staleness and
+missing commits are explicit. ADR-00007 records this extension to ADR-00006.
+
+The older implementation and runtime observations below remain historical context;
+this section and README describe the extended deck.
 
 ## Current implementation
 
@@ -75,10 +95,46 @@ The application container was rebuilt and restarted with the deck available at `
 
 The first suggested frontend lesson is partitioning. The presentation should show actual partitions and offsets while keeping navigation independent of the Kafka consumer lifecycle.
 
-The first deck uses reveal.js and plain JavaScript modules. The provisional concept boundary exposes `onRecord` and `reset` from a registered mount function. Validate it with a second concept before formalizing it. See [ADR-00006](docs/adr/ADR-00006-separate-presentation-and-concept-plugins.md).
+The first deck uses reveal.js and plain JavaScript modules. The concept boundary exposes `onRecord` and `reset` from a registered mount function, with optional `onExperiment` for the group/progress modules. It is now exercised by multiple concepts; ADR-00007 documents the extension. See [ADR-00006](docs/adr/ADR-00006-separate-presentation-and-concept-plugins.md).
 
-Later lessons may add consumer groups, processing and commits, replay, or replication and failure. Those require the relevant observations and controls; the current `record-consumed` event is not evidence for all of them. A second broker and the controller topology should be designed when the local cluster work begins.
+Consumer groups, commits/replay and lag now use the separate experiment observations described above. Replication and failure remain future lessons requiring their own evidence; `record-consumed` alone cannot establish those behaviors. A second broker and the controller topology should be designed when the local cluster work begins.
 
 ## Maintaining these documents
 
 Keep goals in INTENT, current facts and handoff notes here, and operating instructions in README. Add numbered ADRs for meaningful architectural decisions. Mark proposed choices explicitly; when a decision changes, add a superseding ADR and link it from the old one rather than silently replacing the history.
+
+## Verification on 2026-09-09
+
+- Docker `test bootJar` passed all six backend tests, including the new embedded
+  KRaft scenario for independent groups, four-member ownership, inactive-group
+  replay, resume from commits, repeated stops and lag recovery.
+- All four browser tests passed against the refreshed application: live ordering,
+  group controls, topic selection, navigation/reconnect preserving member identity,
+  bounded cards and safe text; mocked cases cover command failure recovery and
+  stale/unknown offset displays. Interactive layouts were captured at 1440×960 and
+  1024×768; explanation/code slides were also checked for viewport overflow.
+- The current Docker context was checked as `colima-kafka-workshop`. Created the
+  three-partition RF1 `kafka-demo-lab` topic and restarted `kafka-demo` with that
+  topic allowlisted and experiments enabled. The previous container is retained,
+  stopped, as `kafka-demo-before-lessons`. At verification end, workload production
+  was stopped, all experiment members were stopped, and broker samples succeeded.
+- Wait for actual observer assignment after restarting before running live tests.
+  Do not run browser verification while replacing the JAR used by the running
+  application; restart it after the build so its classloader sees a consistent JAR.
+
+## Shared membership controls
+
+The groups, offsets and lag panels now reuse `controls/group-membership.js`: A/B
+selection, observed member count/status, partition chips, Add member and Stop group.
+Initial offset policy is under Start position. Group status is derived from worker
+snapshots and assignment coverage; stale state is Unknown, not an asserted broker
+state. No backend or transport contract change was needed.
+
+Widget verification: bootJar passed; two targeted browser tests passed (mocked
+membership transitions/commands and command-error/stale-state behavior). Inspected
+live assignments on all three panels at 1440×960 and 1024×768. Restored the user's
+pre-refresh experiment configuration: one A member, two B members, 1000 ms delay.
+
+Processing delay is now per group (`groupDelays` in snapshots), controlled in the
+shared membership widget on groups/offsets/lag. Commands must identify the group;
+new workers inherit that group’s current setting. The cap remains 1000 ms/record.
