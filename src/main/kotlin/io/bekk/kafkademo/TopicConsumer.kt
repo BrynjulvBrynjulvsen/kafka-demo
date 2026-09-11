@@ -20,7 +20,8 @@ data class ConsumedMessage(
 
 @Component
 class TopicConsumer(private val streams: TopicWebSocketHandler) {
-    @KafkaListener(id = "demo-stream", topics = ["#{@demoTopicNames}"], idIsGroup = false)
+    @KafkaListener(id = "demo-stream", topics = ["#{@demoTopicNames}"], idIsGroup = false,
+        autoStartup = "\${demo.observer-enabled:true}")
     fun consume(record: ConsumerRecord<String, String>) {
         streams.publish(ConsumedMessage(
             topic = record.topic(), partition = record.partition(), offset = record.offset(),

@@ -159,3 +159,146 @@ backend-owned settings, per-group delay lifetime, and limits of inferred status.
 The experiment payload changed from scalar delayMs to groupDelays without an
 experiment envelope version bump; bundled frontend/backend must be refreshed
 together. The original consumed-record protocol is unaffected.
+
+## Migration deck first increment, 2026-09-10
+
+`MIGRATION-DEMO-BACKLOG.md` persists the accepted plan. `/migration.html` now hosts
+three read-only views: topology/configuration, Kubernetes clients plus consumption,
+and a bounded event timeline. `kind-kafka-proxy-poc` is the user's explicit context
+for all demo purposes. ADR-00009 records the independent runtime and logical socket.
+
+`MigrationKubernetes` samples fixed Kubernetes resource types via explicit-context
+kubectl, with bounded output/timeouts and public-field projection. `MigrationState`
+retains independent source errors/times, 100 member/topic and producer/topic entries,
+and 48 events. `MigrationRuntime` consumes the legacy telemetry topic with its own
+observer group and publishes snapshots through the existing bounded socket sender.
+Broker end-offset responses establish telemetry freshness; empty polls alone do not.
+Application consumption ages use ts_consume, so backlog ingestion does not masquerade
+as fresh application progress. Counts remain observations, not integrity assertions.
+
+The `migration` Spring profile disables the workshop observer, experiment runtime
+and producer controller. The default deck is unchanged. See README for configuration,
+startup, endpoints and evidence limitations. Browser navigation retains one socket.
+
+Verification: Docker `test bootJar` passed all 11 backend tests (including four
+migration state/parser tests and an embedded-Kafka migration test for no-viewer
+consumption/commits, reconnect state, independent source errors, one group member,
+and disabled workshop production/observer). Two fixture browser tests passed for
+routing transitions, safe text, navigation/reconnect, bounded history and stale
+sources/stream. Screenshots at 1440×960 and 1024×768 are under build/migration-*.png;
+these contain fixture data, not a live POC observation. Final layout snapshots are
+captured with transitions disabled. Git whitespace checking passed via Docker git.
+
+Live POC verification is pending: host kubeconfig reads failed with operation not
+permitted, including an escalated attempt. Host Gradle's daemon socket was also
+blocked after escalation; the documented Docker build route worked. Host system git
+cannot run without Xcode tools; container git can inspect this checkout. Docker
+context was colima-kafka-workshop, with a kafka-proxy-poc-control-plane container
+present. No POC setup or migration commands were run and no POC files were changed.
+
+A local preview container `kafka-demo-migration-preview` serves port 18080 with
+migration observation explicitly disabled. It uses the migration profile and built
+JAR. Its disabled-source state is intentional, not a verified live connection.
+Stop it before rebuilding the JAR; restart after the build to avoid stale resources.
+The user was given an optional normal-terminal command to export only the Kind
+context to `.local/kubeconfig`; `.local/` is ignored. The observer inherits standard
+KUBECONFIG. Do not print credentials. If that file becomes available, continue live
+verification with the explicit context and update this record.
+
+
+## Live migration observation verified, 2026-09-11
+
+The user exported `.local/kubeconfig`, enabling explicit-context reads against
+kind-kafka-proxy-poc. Legacy routing, both proxy configurations and the client
+workloads are now observed live. The canary is nonessential per the owner; ignore
+its image-pull failure and remove it from the POC in later cleanup.
+
+The first connection exposed an incorrect earlier assumption: legacy's external
+32095 listener is SASL_PLAINTEXT with SCRAM-SHA-512, not PLAINTEXT. Added
+DEMO_MIGRATION_TELEMETRY_CLIENT_PROPERTIES for standard local Kafka client settings.
+The application overrides observer identity/commit settings after loading that file;
+no authentication properties enter snapshots. `.local/telemetry-client.properties`
+contains the POC's provisioned credentials and is ignored/restricted to mode 600.
+
+Host JVM socket access still fails even after escalation. The working runtime is
+Docker container kafka-demo-migration-live on the kind network, publishing
+127.0.0.1:18080. It mounts the built JAR, exported kubeconfig's Docker-specific copy,
+a Linux kubectl copied from the Kind node, local startup script and client properties
+read-only. The config copy addresses the Kind control-plane container and retains
+certificate validation against 127.0.0.1; no TLS checks are disabled. The container
+starts its own legacy 32095 port forward before the backend. All local runtime aids
+are in .local/, not application configuration. The original host config is unchanged.
+Old containers kafka-demo-migration-preview and kafka-demo-migration-before-auth
+are stopped. No cluster setup, cutover or client mutations were performed.
+
+Verification: all 12 backend tests and bootJar pass, including security-property
+loading and protection of the dedicated observer group/commit mode. Live API samples
+showed both source errors null, increasing consumption, eight observed consumer
+members and zero malformed events. The actual observer group is Stable with one
+member. The opt-in migration-live.spec.js checks real socket delivery, advancing
+counts, navigation preserving one connection, and reconnect preserving the backend
+run. Live screenshots are build/migration-live-clients.png and
+build/migration-live-events.png. The timeline intentionally excludes per-record
+traffic; steady activity is shown on the client slide.
+
+## Observation-driven flow stage, 2026-09-11
+
+After the POC reset, restarted kafka-demo-migration-live to recreate its port
+forward and telemetry consumer; both sources recovered. The application is left
+running on port 18080 with fresh real telemetry.
+
+Added `/migration.html#/migration-flow` as a fourth slide. It shows separate
+producer/consumer pod nodes, proxy blocking configuration, legacy/target routes,
+a received-consumption report rate, up to eight group chips and the last transition.
+New snapshot count deltas drive at most six SVG dots toward the consumer node.
+The return path is schematic and does not attribute records to a broker. Producer
+and replication paths stay static/unmeasured; configured broker paths are never
+animated. Stale sources remove highlights/activity as appropriate. Baselines reset
+on reconnect, run changes, source failures and long sample gaps. Hidden slides
+update state but create no dots; reduced motion retains counts without animation.
+No backend protocol or observation semantics changed.
+
+Validation: bootJar and git whitespace check pass. All four targeted browser tests
+pass: three fixture tests (including the new flow behavior/reduced-motion test) and
+one real-Poc read-only check extended to the flow stage. Inspected live and laptop
+screenshots in build/migration-flow-live.png and build/migration-flow-laptop.png.
+The existing detailed topology, clients and event views remain available.
+
+Investigating a browser stuck on Connecting: the live API and host-port WebSocket
+handshake/delivery were healthy, and a fresh WebKit browser connected successfully.
+The existing user tab could not be inspected because the browser tool failed to
+start. Migration HTML now catches module startup errors and distinguishes page
+loading from stream connection. The migration profile serves static assets with
+Cache-Control: no-cache so reloads revalidate modules after a rebuild. The cause
+in the existing tab remains unconfirmed; a reload is needed to load these changes.
+
+## Lessons against POC legacy Kafka
+
+`application-poc-legacy.yml` adds an optional lesson profile for the direct external
+legacy listener at localhost:32095 (SASL_PLAINTEXT / SCRAM-SHA-512). It imports a
+required local standard Kafka properties file via KAFKA_CLIENT_PROPERTIES and
+maps its sasl.jaas.config into shared Spring Kafka properties. Producer, observer,
+experiment workers and admin operations inherit authentication. Lesson groups
+default to kafka-demo-poc-observer and kafka-demo-poc-experiment-a/-b; topics remain
+kafka-demo and kafka-demo-lab. Workshop defaults remain unchanged. Do not combine
+this profile with migration. README includes host startup and topic prerequisites;
+decks.sh still resumes existing containers without reconfiguring their profiles.
+
+The profile binding test passed for all client security maps and observer settings;
+bootJar passed. No live lesson traffic or topic creation was performed against the
+POC. The migration container was stopped for JAR replacement and restarted.
+
+Live follow-up: the host legacy forward was absent and both lesson topics were
+missing. Created kafka-demo and kafka-demo-lab on legacy, each three partitions/RF1,
+and started a host forward using the explicit Kind context/exported kubeconfig.
+Host default Java was 26.0.2; a tool-launched Java 17 attempt could not bind/connect
+even after escalation. The user's original AdminClient thread exit cause remains
+unconfirmed because its initial exception was unavailable.
+
+Started kafka-demo-poc-legacy on Docker's kind network, publishing 127.0.0.1:8080,
+with the poc-legacy profile, Java 17, mounted JAR/client properties/exported Docker
+kubeconfig/Linux kubectl and its own legacy port forward. The migration backend
+continues independently on 18080. Admin sampling succeeded with all three lab
+partitions; one diagnostic message was acknowledged and observed through WebSocket
+with matching partition 2, offset 0. No experiment workers were started. README
+documents saved-container controls; decks.sh still controls the workshop container.

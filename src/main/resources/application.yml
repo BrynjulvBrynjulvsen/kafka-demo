@@ -36,3 +36,13 @@ demo:
     enabled: ${DEMO_EXPERIMENT_ENABLED:true}
     topic: ${DEMO_EXPERIMENT_TOPIC:kafka-demo-lab}
     group-prefix: ${DEMO_EXPERIMENT_GROUP_PREFIX:kafka-demo-experiment}
+
+  migration:
+    enabled: ${DEMO_MIGRATION_ENABLED:false}
+    context: ${DEMO_MIGRATION_CONTEXT:kind-kafka-proxy-poc}
+    namespace: ${DEMO_MIGRATION_NAMESPACE:kafka-platform-poc}
+    kubectl: ${DEMO_MIGRATION_KUBECTL:kubectl}
+    telemetry-bootstrap: ${DEMO_MIGRATION_TELEMETRY_BOOTSTRAP:localhost:32095}
+    telemetry-topic: ${DEMO_MIGRATION_TELEMETRY_TOPIC:telemetry}
+    telemetry-group: ${DEMO_MIGRATION_TELEMETRY_GROUP:kafka-demo-migration-observer}
+    telemetry-client-properties: ${DEMO_MIGRATION_TELEMETRY_CLIENT_PROPERTIES:}

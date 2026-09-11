@@ -1,0 +1,13 @@
+# Isolated read-only presentation. The original lesson runtime stays inactive.
+spring:
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+demo:
+  observer-enabled: false
+  experiment:
+    enabled: false
+  migration:
+    enabled: true

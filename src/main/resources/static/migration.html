@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kafka migration · live observations</title>
+  <link rel="stylesheet" href="vendor/reveal/reveal.css">
+  <link rel="stylesheet" href="css/slides.css"><link rel="stylesheet" href="css/migration.css">
+</head>
+<body class="migration-deck">
+<header class="deck-header"><a href="/">BEKK <span>/ KAFKA MIGRATION</span></a><span id="connection" role="status">Loading presentation…</span></header>
+<div class="reveal"><div class="slides">
+<section id="migration" data-migration-concept="topology">
+  <p class="eyebrow">OBSERVE / KROXYLICIOUS + CLUSTER LINKING</p>
+  <h2>One endpoint. Two clusters.</h2>
+  <div class="source-strip" data-role="sources"></div>
+  <div class="topology">
+    <article class="topology-clients"><span class="node-label">CLIENT FLEET</span><strong data-role="fleet">Waiting for Kubernetes</strong><p>Producers · consumers · Streams</p><small>Pod readiness is separate from progress</small></article>
+    <div class="route-arrow">→</div>
+    <article class="topology-proxy"><span class="node-label">STABLE ENDPOINT / KROXYLICIOUS</span><strong data-role="route">Route unknown</strong><p data-role="endpoints">Ready endpoints unknown</p><small>Service selection; existing connections may differ</small></article>
+    <div class="cluster-paths"><article data-role="legacy-node"><span class="node-label">LEGACY KAFKA</span><strong data-role="legacy-route">Route unknown</strong><p>Hosts the telemetry topic</p></article><div class="replication-link">↓ Cluster Linking · status unobserved</div><article data-role="target-node"><span class="node-label">TARGET KAFKA</span><strong data-role="target-route">Route unknown</strong><p>Record arrival does not prove client writes</p></article></div>
+  </div>
+  <div class="proxy-configs" data-role="proxies"></div>
+  <p class="legend">Highlight = configured upstream route, not measured traffic. ConfigMap revision ≠ loaded proxy revision.</p>
+  <p class="migration-prompt">Predict: what happens to clients while the proxy blocks writes?</p>
+</section>
+<section id="migration-clients" data-migration-concept="clients">
+  <p class="eyebrow">OBSERVE / CLIENT CONTINUITY</p><h2>Running—and making progress?</h2>
+  <div class="source-strip" data-role="sources"></div>
+  <div class="client-columns"><article class="migration-panel"><h3>Kubernetes workloads</h3><div class="scroll-panel" data-role="workloads"></div></article>
+  <article class="migration-panel"><h3>Consumer observations</h3><p class="legend" data-role="consumed">Waiting for telemetry</p><div class="scroll-panel" data-role="members"></div></article></div>
+  <p class="legend">Consumer member IDs are not mapped to pods. Consumption age uses the client’s timestamp; clocks can differ. This is not commit evidence.</p>
+  <p class="legend">Producer acknowledgment and Streams application progress are unobserved. No recent record can mean idle, blocked, or disconnected.</p>
+</section>
+<section id="migration-events" data-migration-concept="events">
+  <p class="eyebrow">OBSERVE / THE CUTOVER</p><h2>Follow the transitions.</h2>
+  <div class="source-strip" data-role="sources"></div>
+  <div class="timeline-layout"><article class="migration-panel"><h3>Observed events <small>latest 48</small></h3><div class="event-timeline" data-role="events"></div></article>
+  <aside class="migration-panel presenter-notes"><h3>Run from the POC terminal</h3><pre>./helper-scripts/kroxy/migrate-to-target.sh</pre><p>Block writes → inspect replication and offsets → fail over → switch route → observe recovery.</p><p>The timeline reports Kubernetes changes and assignment telemetry. Script phases and write acknowledgments are not instrumented yet.</p><p>Reconnection restores this backend’s bounded history. Backend restart begins a new observation window.</p></aside></div>
+</section>
+<section id="migration-flow" data-migration-concept="flow">
+  <p class="eyebrow">LIVE / FOLLOW THE RECORDS</p><h2>Watch the handover.</h2>
+  <div class="flow-toolbar"><div class="source-strip" data-role="sources"></div><span class="flow-rate"><b data-role="rate">—</b> <span>consumption reports / sec</span></span></div>
+  <div class="flow-scene">
+    <svg viewBox="0 0 1160 380" role="img" aria-label="Producers and consumers connected through Kroxylicious to legacy and target brokers. Animated dots represent received consumption reports on a schematic return path.">
+      <defs><marker id="flow-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker></defs>
+      <path class="flow-wire produce-wire" d="M250 85 C360 85 350 165 470 165" marker-end="url(#flow-arrow)"/>
+      <path class="flow-wire return-wire" data-role="return-path" d="M470 210 C350 210 360 285 250 285" marker-end="url(#flow-arrow)"/>
+      <path class="flow-wire broker-wire" data-role="legacy-wire" d="M700 165 C810 165 800 85 900 85" marker-end="url(#flow-arrow)"/>
+      <path class="flow-wire broker-wire" data-role="target-wire" d="M700 205 C810 205 800 305 900 305" marker-end="url(#flow-arrow)"/>
+      <path class="flow-wire replication-wire" d="M1015 140 L1015 250" marker-end="url(#flow-arrow)"/>
+      <text x="320" y="65" class="wire-label">PRODUCE</text><text x="310" y="328" class="wire-label">CONSUME</text>
+      <text x="1030" y="192" class="wire-label">CLUSTER</text><text x="1030" y="211" class="wire-label">LINKING</text>
+      <g data-role="particles"></g>
+    </svg>
+    <article class="flow-node flow-producer"><span class="node-label">PRODUCERS</span><strong data-role="producer-count">—</strong><p>Acknowledgments unobserved</p><div class="pod-lights" data-role="producer-lights"></div></article>
+    <article class="flow-node flow-consumer"><span class="node-label">CONSUMERS</span><strong data-role="consumer-count">—</strong><p data-role="activity">Waiting for observations</p><div class="pod-lights" data-role="consumer-lights"></div></article>
+    <article class="flow-node flow-proxy"><span class="node-label">KROXYLICIOUS</span><strong data-role="variant">Unknown</strong><p data-role="policy">Configuration unknown</p><small data-role="endpoint-count">—</small></article>
+    <article class="flow-node flow-legacy" data-role="legacy"><span class="node-label">LEGACY BROKER</span><strong data-role="legacy-state">Unconfirmed</strong><p>Telemetry remains here</p></article>
+    <article class="flow-node flow-target" data-role="target"><span class="node-label">TARGET BROKER</span><strong data-role="target-state">Unconfirmed</strong><p>Mirror activity unobserved</p></article>
+  </div>
+  <div class="flow-bottom"><div><span class="node-label">RECENT CONSUMER GROUP ACTIVITY</span><div class="flow-groups" data-role="groups"></div></div><div class="flow-transition"><span class="node-label">LAST TRANSITION</span><p data-role="transition">Waiting for an event</p></div></div>
+  <p class="legend">Dots summarize newly received consumption reports, not individual packets. The return path is schematic; telemetry does not identify the serving cluster. Blue broker paths show fresh configured routing. Dashed paths are unmeasured.</p>
+</section>
+</div></div>
+<footer><span data-role="environment">Read-only migration observations</span><button id="reconnect" class="secondary">Reconnect stream</button><span>← → NAVIGATE · ESC OVERVIEW</span></footer>
+<script>
+  // Keep this outside the module graph so failed imports have a visible recovery path.
+  const startupStatus = document.querySelector('#connection');
+  const startupTimeout = setTimeout(() => {
+    startupStatus.textContent = 'Presentation loading slowly · reload the page to retry';
+    startupStatus.dataset.state = 'error';
+  }, 10000);
+  import('./js/migration.js').then(() => clearTimeout(startupTimeout)).catch(error => {
+    clearTimeout(startupTimeout);
+    console.error('Migration presentation startup failed', error);
+    startupStatus.textContent = 'Presentation failed to load · reload the page to retry';
+    startupStatus.dataset.state = 'error';
+  });
+</script>
+</body></html>

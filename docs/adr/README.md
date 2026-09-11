@@ -14,3 +14,5 @@ Use `ADR-0000X-short-decision-desc.md` filenames, continuing the five-digit sequ
 | [ADR-00008](ADR-00008-shared-group-controls-and-settings.md) | Accepted | Shared membership controls, backend-owned per-group delay, and evidence-based status |
 
 These records document the direction in [INTENT.md](../../INTENT.md). See [CONTEXT.md](../../CONTEXT.md) for implementation status. If an accepted decision changes, create a new record and update the prior record's status and superseding link.
+
+- [ADR-00009](ADR-00009-read-only-migration-observations.md): Separate migration deck, read-only runtime, and source-specific evidence.

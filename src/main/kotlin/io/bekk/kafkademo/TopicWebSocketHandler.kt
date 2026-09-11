@@ -63,6 +63,11 @@ class TopicWebSocketHandler(private val json: ObjectMapper) : TextWebSocketHandl
     }
 
     fun publishExperiment(topic: String, snapshot: Map<String, Any?>) {
+        publishSnapshot(topic, snapshot)
+    }
+
+    /** Logical channels can carry snapshots independently of Kafka topic subscriptions. */
+    fun publishSnapshot(topic: String, snapshot: Any) {
         val message = TextMessage(json.writeValueAsString(snapshot))
         experiments[topic] = message
         viewers.values.filter { it.topic == topic }.forEach { viewer ->

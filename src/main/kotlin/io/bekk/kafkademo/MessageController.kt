@@ -4,6 +4,7 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.Size
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.springframework.http.HttpStatus
+import org.springframework.context.annotation.Profile
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
@@ -22,6 +23,7 @@ data class ProduceMessage(
 data class ProducedMessage(val topic: String, val partition: Int, val offset: Long, val timestamp: Long)
 
 @RestController
+@Profile("!migration")
 @RequestMapping("/api")
 class MessageController(private val kafka: KafkaTemplate<String, String>, private val config: DemoProperties) {
     @GetMapping("/topics")

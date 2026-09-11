@@ -41,3 +41,11 @@ Do not imply guarantees the observations cannot establish. A consumed record doe
 - 2026-09-07: Narrowed implementation to the backend first, using the workshop's existing broker and adding HTTP production and per-topic WebSocket subscriptions.
 
 Update this document when the owner's goals or scope change. Record architectural choices and their tradeoffs in [ADRs](docs/adr/README.md); keep the current implementation and working context in [CONTEXT.md](CONTEXT.md).
+
+## Migration presentation variant
+
+- 2026-09-10: Add a separate read-only presentation for the sibling kafka-proxy-poc,
+  scoped to Kroxylicious + Cluster Linking in kind-kafka-proxy-poc. Reuse the deck
+  and connection patterns while observing Kubernetes and legacy telemetry. The POC
+  scripts continue to own setup and migration. MIGRATION-DEMO-BACKLOG.md tracks
+  the first increment and later instrumentation.

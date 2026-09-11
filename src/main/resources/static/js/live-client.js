@@ -3,6 +3,12 @@ export class LiveClient extends EventTarget {
   constructor() { super(); this.generation = 0; }
   emit(type, detail) { this.dispatchEvent(new CustomEvent(type, { detail })); }
   connect(topic) {
+    this.connectChannel(topic);
+  }
+  connectMigration() {
+    this.connectChannel(null);
+  }
+  connectChannel(topic) {
     this.disconnect();
     const generation = this.generation;
     this.topic = topic;
@@ -15,18 +21,21 @@ export class LiveClient extends EventTarget {
     }, 1000);
     const open = () => {
       if (generation !== this.generation) return;
-      this.emit('status', { state: 'connecting', text: `Connecting to ${topic}…` });
-      const url = new URL(`/ws/topics/${encodeURIComponent(topic)}`, location.href);
+      this.emit('status', { state: 'connecting', text: `Connecting to ${topic ?? 'migration observations'}…` });
+      const url = new URL(topic === null ? '/ws/migration' : `/ws/topics/${encodeURIComponent(topic)}`, location.href);
       url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
       const socket = this.socket = new WebSocket(url);
       socket.onmessage = ({ data }) => {
         if (generation !== this.generation) return;
         let event;
         try { event = JSON.parse(data); } catch { return; }
-        if (event.version !== 1 || event.topic !== topic) return;
+        if (event.version !== 1 || (topic !== null && event.topic !== topic)) return;
         if (event.type === 'subscribed') {
           attempts = 0;
-          this.emit('status', { state: 'live', text: `Subscribed · ${topic} · no replay` });
+          this.emit('status', { state: 'live', text: topic === null ? 'Migration observation stream connected' : `Subscribed · ${topic} · no replay` });
+        } else if (topic === null && event.type === 'migration-snapshot' && Array.isArray(event.events)
+          && Array.isArray(event.members) && event.kubernetes && event.telemetry) {
+          this.emit('migration', event);
         } else if (event.type === 'experiment-snapshot' && Array.isArray(event.members) && Array.isArray(event.offsets)) {
           lastExperiment = event; receivedAt = Date.now();
           this.emit('experiment', event);

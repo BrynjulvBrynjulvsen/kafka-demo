@@ -21,6 +21,17 @@ class WebSocketConfiguration(
     fun demoTopicNames(): Array<String> = config.topics.toTypedArray()
 
     override fun registerWebSocketHandlers(registry: WebSocketHandlerRegistry) {
+        registry.addHandler(handler, "/ws/migration")
+            .setAllowedOrigins(*config.allowedOrigins.toTypedArray())
+            .addInterceptors(object : HandshakeInterceptor {
+                override fun beforeHandshake(request: ServerHttpRequest, response: ServerHttpResponse,
+                    wsHandler: WebSocketHandler, attributes: MutableMap<String, Any>): Boolean {
+                    attributes["topic"] = MIGRATION_CHANNEL
+                    return true
+                }
+                override fun afterHandshake(request: ServerHttpRequest, response: ServerHttpResponse,
+                    wsHandler: WebSocketHandler, exception: Exception?) = Unit
+            })
         registry.addHandler(handler, "/ws/topics/{topic}")
             .setAllowedOrigins(*config.allowedOrigins.toTypedArray())
             .addInterceptors(object : HandshakeInterceptor {

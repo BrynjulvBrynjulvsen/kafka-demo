@@ -185,3 +185,41 @@ groups or receiving updates from another viewer. Lag displays both group delays.
 [ADR-00008](adr/ADR-00008-shared-group-controls-and-settings.md) records why selection
 is panel-local while membership and per-group settings are backend-owned, and why
 the widget status is an observation summary rather than a broker-state claim.
+
+## Migration presentation
+
+`/migration.html` is a separate deck for the sibling POC's Kroxylicious + Cluster
+Linking demo. Its `js/migration.js` explicitly mounts topology, client and event
+views from `js/concepts/migration-views.js`. Their contract is
+`onMigration(snapshot, { now, connected })`; they render bounded state only.
+The shell owns the freshness timer, one `LiveClient.connectMigration()` connection,
+and page lifecycle. Navigation never changes subscriptions or invokes commands.
+
+`GET /api/migration` and `/ws/migration` expose version-1 `migration-snapshot`
+envelopes. This logical channel is independent of the original selected topic and
+experiment APIs; the original lesson contracts are unchanged. Backend reconnect
+restores the latest snapshot, including up to 48 events from this backend session.
+Use source timestamps/errors plus stream freshness; a fresh snapshot does not mean
+all sources succeeded. Last-known routing must lose its active highlight when stale.
+
+The first increment observes Kubernetes and existing legacy telemetry. It cannot
+establish direct writes to either cluster, mirror lag, loaded proxy configuration,
+producer acknowledgments, commits, or Streams application progress. Do not draw
+traffic animations from a Service selector or label telemetry counts as unique
+records. See MIGRATION-DEMO-BACKLOG.md and ADR-00009 for planned evidence extensions.
+
+Run `tests/browser/migration.spec.js` for fixture-based rendering, independent source
+failures, stale streams, bounded events and navigation/reconnect. These checks do
+not validate the real POC. For live verification use the README migration profile
+and inspect actual source timestamps and POC state without running a migration.
+
+The `migration-flow` slide uses `migration-flow.js` with the same `onMigration`
+contract. Consumption deltas between snapshots drive at most six SVG dots on a
+schematic proxy-to-consumer return path. No animated path originates from a broker:
+the telemetry cannot attribute a consumed record to a cluster. Producer and Cluster
+Linking edges stay static. Active broker edges reflect only fresh configuration.
+First samples, backend run changes, stale sources and gaps over five seconds reset
+the activity baseline. Hidden views still update baselines but create no animations;
+reduced-motion viewers retain numeric activity without moving dots. Rendering never
+creates Kafka consumers, commands or sockets. Counts/rates are received reports,
+not unique records or producer throughput, and can include retained telemetry.
