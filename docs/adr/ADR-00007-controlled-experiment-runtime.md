@@ -2,6 +2,9 @@
 
 Status: Accepted, 2026-09-09
 
+Application placement superseded by [ADR-00010](ADR-00010-core-and-sibling-demos.md). Observation/lifecycle decisions remain applicable.
+
+
 Lessons about groups, commits and lag need evidence beyond observer record cards.
 Use a backend-owned, opt-in runtime on a dedicated configured topic, with two
 allowlisted groups and at most four members per group. A readable KafkaConsumer

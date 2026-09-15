@@ -4,6 +4,9 @@ Date: 2026-09-07
 
 Status: Accepted
 
+Application placement superseded by [ADR-00010](ADR-00010-core-and-sibling-demos.md). Observation/lifecycle decisions remain applicable.
+
+
 ## Context
 
 The owner wants a browser presentation with directed navigation and pluggable live Kafka illustrations. A new concept should reuse the surrounding scaffolding. The first implementation exercises this separation with a partitioning lesson.

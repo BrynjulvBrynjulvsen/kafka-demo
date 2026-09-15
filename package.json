@@ -1,15 +1,11 @@
 {
-  "name": "kafka-demo-slides",
+  "name": "kafka-demo-presentation",
   "private": true,
   "type": "module",
   "scripts": {
-    "vendor": "node scripts/vendor-slides.js",
-    "test:browser": "playwright test"
+    "vendor": "node presentation/vendor-slides.js"
   },
   "dependencies": {
     "reveal.js": "5.2.1"
-  },
-  "devDependencies": {
-    "@playwright/test": "^1.63.0"
   }
 }

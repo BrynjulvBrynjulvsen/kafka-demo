@@ -1,13 +1,17 @@
 ---
 name: add-kafka-lesson
-description: Add or extend reveal.js slides and live Kafka concept modules in the kafka-demo project. Use for new Kafka lessons, illustrations, and presenter controls; not for creating Codex plugin bundles or general Kafka administration.
+description: Add or extend reveal.js slides and live Kafka concept modules in Kafka demo applications using the shared kafka-demo core. Use for new Kafka lessons, illustrations, and presenter controls; not for creating Codex plugin bundles or general Kafka administration.
 ---
 
 # Add a Kafka lesson
 
-Work in the user's kafka-demo checkout. Confirm it contains `src/main/resources/static/js/slides.js` and `docs/ADDING_LESSONS.md`; if invoked elsewhere, locate the intended checkout from session context before editing. Do not hardcode a machine-specific checkout path.
-
-Read `AGENTS.md`, `INTENT.md`, and `docs/ADDING_LESSONS.md` in that checkout. The authoring guide is authoritative for the current extension contract and contains a complete minimal concept recipe. Read `CONTEXT.md` and the root `README.md` when running the application or tests; runtime notes are dated observations.
+Locate the intended demo from session context: original lessons live in the sibling
+`kafka-lessons`, migration views in `kafka-migration-demo`, and reusable libraries in
+`kafka-demo`. Do not assume a slideset lives in the core checkout or hardcode an
+absolute machine path. Read the target's AGENTS.md, INTENT.md, CONTEXT.md and README.
+Read the core's docs/ADDING_LESSONS.md for shared contracts and the target demo's
+same-named guide for feature recipes. Prefer a demo-local feature; change core only
+when the shared boundary actually needs to change.
 
 Choose the smallest change that teaches the requested behavior:
 

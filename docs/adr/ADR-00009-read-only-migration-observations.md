@@ -3,6 +3,9 @@
 Date: 2026-09-10
 Status: Accepted
 
+Application placement superseded by [ADR-00010](ADR-00010-core-and-sibling-demos.md). Observation/lifecycle decisions remain applicable.
+
+
 ## Context
 
 The sibling kafka-proxy-poc presents Kroxylicious and Cluster Linking across two
