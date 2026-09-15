@@ -9,7 +9,7 @@ plugins {
 repositories { mavenCentral() }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
     compilerOptions { freeCompilerArgs.add("-Xjsr305=strict") }
 }
 

@@ -7,7 +7,7 @@ Use the shared [authoring skill](../.agents/skills/add-kafka-lesson/SKILL.md).
 
 ## New demo
 
-Start an independent Spring Boot/Kotlin application with Java 17. Declare dependencies
+Start an independent Spring Boot/Kotlin application with Java 21. Declare dependencies
 on `io.bekk.kafkademo:backend:0.1.0-SNAPSHOT` and
 `io.bekk.kafkademo:presentation:0.1.0-SNAPSHOT`. Use the existing demos' build files for
 matching plugin versions and this settings fragment for local source development:

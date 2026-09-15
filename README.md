@@ -14,7 +14,7 @@ this core checkout beside it; this repository is a library, not the slide applic
 
 ## Build
 
-JDK 17 and the included Gradle wrapper:
+JDK 21 and the included Gradle wrapper:
 
 ```sh
 ./gradlew test assemble
@@ -28,7 +28,7 @@ Docker alternative:
 
 ```sh
 docker run --rm -v "$PWD:/workspace" -v kafka-demo-gradle-cache:/home/gradle/.gradle \
-  -w /workspace gradle:8.14.3-jdk17 gradle --no-daemon test assemble
+  -w /workspace gradle:8.14.3-jdk21 gradle --no-daemon test assemble
 ```
 
 ## Develop a demo with local core changes
